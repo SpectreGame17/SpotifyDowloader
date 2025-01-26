@@ -15,13 +15,14 @@ This program enables you to download entire Spotify playlists as MP3 files quick
 
 The following Python libraries are required to run this program:  
 - `spotipy`   
-- `yt-dlp`  
+- `yt-dlp`
+- `mutagen` 
 
 ## Installing Dependencies  
  
 Run the following command to install the required libraries:  
 ```bash
-pip install spotipy yt-dlp
+pip install mutagen spotipy yt-dlp
 ```
 ## Additional Tool  
  
