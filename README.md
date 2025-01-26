@@ -43,10 +43,15 @@ sudo apt install ffmpeg
   
 ## Usage  
  
-1. Clone this repository.  
-2. Configure the number of threads in the settings file or command-line arguments. 
+1. Clone this repository.
+2. Configure Client Id and Client Secret
+```python
+ client_id = ""  # Enter your Spotify Client ID
+ client_secret = ""  # Enter your Spotify Client Secret 
+```
+3. Configure the number of threads in the settings file or command-line arguments. 
 ```python
  max_threads = 14  # Number of simultaneous downloads (adjust based on your PC's capability) 
 ``` 
-3. Provide a Spotify playlist link.  
-4. Run the program and enjoy your MP3 downloads!  
+4. Provide a Spotify playlist link.  
+5. Run the program and enjoy your MP3 downloads!  
