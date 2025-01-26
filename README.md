@@ -6,7 +6,8 @@ This program enables you to download entire Spotify playlists as MP3 files quick
 - **Metadata Support**: Each MP3 file is saved with proper metadata (title, artist, album, etc.) for better organization.  
 
 ## Requirements  
-- A valid Spotify account (free or premium).  
+- Spotify API credentials (Client ID and Client Secret).
+  https://developer.spotify.com/ 
 - Internet connection.  
 - Required dependencies (detailed in the setup instructions below).  
 
