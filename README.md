@@ -34,8 +34,8 @@ sudo apt update
 sudo apt install ffmpeg
 ```
 - **On Windows**:
-- Download the FFmpeg executable from the official site: https://ffmpeg.org/download.html.
-- Add FFmpeg to your system's PATH environment variable (refer to the official guide for 
+-- Download the FFmpeg executable from the official site: https://ffmpeg.org/download.html.
+-- Add FFmpeg to your system's PATH environment variable (refer to the official guide for 
   instructions).
   
 ## Usage  
