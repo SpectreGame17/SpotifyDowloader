@@ -1,4 +1,5 @@
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
@@ -9,8 +10,8 @@ from pathlib import Path
 
 def get_spotify_playlist_tracks(playlist_url):
     """Extract song titles and artist names from a Spotify playlist."""
-    client_id = ""  # Enter your Spotify Client ID
-    client_secret = ""  # Enter your Spotify Client Secret
+    client_id = "f4cf8d845f51428ab61842373bab5291"  # Enter your Spotify Client ID
+    client_secret = "100442b0796c4587954437c417b1f95f"  # Enter your Spotify Client Secret
 
     sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=client_id, client_secret=client_secret))
 
@@ -25,11 +26,14 @@ def get_spotify_playlist_tracks(playlist_url):
     while True:
         results = sp.playlist_tracks(playlist_id, offset=offset)
 
+        
+
         for item in results['items']:
             track = item['track']
             if track:
                 name = track.get('name', 'Unknown Track')
-                artists = ', '.join([artist.get('name', 'Unknown Artist') for artist in track.get('artists', [])])
+                # Correzione: Se l'artista è None, usa 'Unknown Artist'
+                artists = ', '.join([artist.get('name', 'Unknown Artist') if artist.get('name') else 'Unknown Artist' for artist in track.get('artists', [])])
                 album = track.get('album', {}).get('name', 'Unknown Album')
                 track_number = track.get('track_number', None)
 
@@ -67,7 +71,7 @@ def search_youtube(query):
 
 def download_from_youtube(url, output_folder, track_info):
     """Download a video from YouTube as an audio file and set metadata."""
-    file_name = f"{track_info['name']}"  
+    file_name = re.sub(r'[\/:*?"<>|]', " ", track_info['name'])  
     output_path = Path(output_folder) / file_name  # Usa Path per unire i percorsi
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -100,15 +104,18 @@ def download_from_youtube(url, output_folder, track_info):
 
 def process_track(track, output_folder):
     """Process a single track: search on YouTube, download, and set metadata."""
-    query = f"{track['name']} {track['artists']} audio"
-    print(f"Searching: {query}")
-    youtube_url = search_youtube(query)
+    try:
+        query = f"{track['name']} {track['artists']} audio"
+        print(f"Searching: {query}")
+        youtube_url = search_youtube(query)
 
-    if youtube_url:
-        print(f"Downloading from: {youtube_url}")
-        download_from_youtube(youtube_url, output_folder, track)
-    else:
-        print(f"Not found on YouTube: {query}")
+        if youtube_url:
+            print(f"Downloading from: {youtube_url}")
+            download_from_youtube(youtube_url, output_folder, track)
+        else:
+            print(f"Not found on YouTube: {query}")
+    except Exception as e:
+        print(f"Error processing track {track['name']} by {track['artists']}: {e}")
 
 if __name__ == "__main__":
     playlist_url = input("Enter the Spotify playlist link: ")
