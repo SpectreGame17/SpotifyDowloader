@@ -40,6 +40,9 @@ sudo apt install ffmpeg
   
 ## Usage  
 1. Clone this repository.  
-2. Configure the number of threads in the settings file or command-line arguments.  
+2. Configure the number of threads in the settings file or command-line arguments. 
+```python
+ max_threads = 14  # Number of simultaneous downloads (adjust based on your PC's capability) 
+``` 
 3. Provide a Spotify playlist link.  
 4. Run the program and enjoy your MP3 downloads!  
