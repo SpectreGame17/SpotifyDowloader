@@ -14,8 +14,8 @@ This program enables you to download entire Spotify playlists as MP3 files quick
 ## Dependencies  
 
 The following Python libraries are required to run this program:  
-- `spotipy` (install via `pip install spotipy`)  
-- `yt-dlp` (install via `pip install yt-dlp`)  
+- `spotipy`   
+- `yt-dlp`  
 
 ### Installing Dependencies  
 Run the following command to install the required libraries:  
