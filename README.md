@@ -17,13 +17,13 @@ The following Python libraries are required to run this program:
 - `spotipy`   
 - `yt-dlp`  
 
-### Installing Dependencies  
+## Installing Dependencies  
  
 Run the following command to install the required libraries:  
 ```bash
 pip install spotipy yt-dlp
 ```
-### Additional Tool  
+## Additional Tool  
  
 **FFmpeg**: Required for processing and converting audio files:  
 **On macOs** (using Homebrew)
