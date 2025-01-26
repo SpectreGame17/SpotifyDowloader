@@ -23,7 +23,7 @@ Run the following command to install the required libraries:
 pip install spotipy yt-dlp
 ```
 ### Additional Tool  
-- **FFmpeg**: Required for processing and converting audio files.
+**FFmpeg**: Required for processing and converting audio files.
 **On macOs** (using Homebrew)
 ```bash
 brew install ffmpeg
