@@ -1,23 +1,36 @@
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
-from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
+from concurrent.futures import ThreadPoolExecutor
 import yt_dlp
+from spotipy.oauth2 import SpotifyClientCredentials
+from dotenv import load_dotenv
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 from pathlib import Path
 
+
+load_dotenv()
+client_id = os.getenv("SPOTIFY_CLIENT_ID")
+client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+
+def clear_terminal():
+    # Per Windows
+    if os.name == 'nt':
+        os.system('cls')
+    # Per macOS e Linux
+    else:
+        os.system('clear')
+
 def get_spotify_playlist_tracks(playlist_url):
-    """Extract song titles and artist names from a Spotify playlist."""
-    client_id = "f4cf8d845f51428ab61842373bab5291"  # Enter your Spotify Client ID
-    client_secret = "100442b0796c4587954437c417b1f95f"  # Enter your Spotify Client Secret
 
-    sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=client_id, client_secret=client_secret))
-
+    auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+    sp = spotipy.Spotify(auth_manager=auth_manager)
+    
     if "playlist" in playlist_url:
         playlist_id = playlist_url.split("/")[-1].split("?")[0]
     else:
+        
         raise ValueError("Invalid playlist URL")
 
     tracks = []
@@ -101,6 +114,15 @@ def download_from_youtube(url, output_folder, track_info):
         audio.save()
     except Exception as e:
         print(f"Error adding metadata to {file_name}: {e}")
+        file_path = os.path.join(output_folder, "Error.txt")
+
+        if not os.path.exists(file_path):
+            open(file_path, 'w').close()
+
+        with open(file_path, 'a') as file:
+            file.write(f"[ERROR] adding metadata to {file_name}: {e}\n")
+
+
 
 def process_track(track, output_folder):
     """Process a single track: search on YouTube, download, and set metadata."""
@@ -114,15 +136,36 @@ def process_track(track, output_folder):
             download_from_youtube(youtube_url, output_folder, track)
         else:
             print(f"Not found on YouTube: {query}")
+         
+            
+
     except Exception as e:
         print(f"Error processing track {track['name']} by {track['artists']}: {e}")
+        file_path = os.path.join(output_folder, "Not found.txt")
+
+        if not os.path.exists(file_path):
+            open(file_path, 'w').close()
+
+        with open(file_path, 'a') as file:
+            file.write(f"[MISSING] Song not found: {track['name']} by {track['artists']}: {e}\n")
+
 
 if __name__ == "__main__":
+    
     playlist_url = input("Enter the Spotify playlist link: ")
     output_folder = input("Enter the destination folder: ")
 
+
+    if not output_folder:
+        output_folder = "/app/downloads"  # Cartella predefinita nel container
+
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
+
+  
+    clear_terminal()
+    print(f"The songs will be saved in: {output_folder}")
 
     print("Extracting tracks from the playlist...")
     tracks = get_spotify_playlist_tracks(playlist_url)
@@ -132,5 +175,5 @@ if __name__ == "__main__":
     with ThreadPoolExecutor(max_threads) as executor:
         for track in tracks:
             executor.submit(process_track, track, output_folder)
-
+    clear_terminal()
     print("\nDownload complete!")
