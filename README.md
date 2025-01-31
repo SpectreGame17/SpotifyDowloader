@@ -22,7 +22,7 @@ The following Python libraries are required to run this program:
  
 Run the following command to install the required libraries:  
 ```bash
-pip install mutagen spotipy yt-dlp
+pip install -r requirements.txt
 ```
 ## Additional Tool  
  
@@ -44,14 +44,11 @@ sudo apt install ffmpeg
 ## Usage  
  
 1. Clone this repository.
-2. Configure Client Id and Client Secret
-```python
- client_id = ""  # Enter your Spotify Client ID
- client_secret = ""  # Enter your Spotify Client Secret 
+2. Configure Client Id, Client Secret, and Max Threads in .env file:
+  Create a .env file in the same directory as your script and add the following variables
+```env
+CLIENT_ID="your_spotify_client_id"
+CLIENT_SECRET="your_spotify_client_secret"
+MAX_THREADS=14  # Number of simultaneous downloads (adjust based on your PC's capability)
 ```
-3. Configure the number of threads in the settings file or command-line arguments. 
-```python
- max_threads = 14  # Number of simultaneous downloads (adjust based on your PC's capability) 
-``` 
-4. Provide a Spotify playlist link.  
-5. Run the program and enjoy your MP3 downloads!  
+3. Run the program and enjoy your MP3 downloads!   

@@ -23,14 +23,12 @@ def clear_terminal():
         os.system('clear')
 
 def get_spotify_playlist_tracks(playlist_url):
-
     auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
     sp = spotipy.Spotify(auth_manager=auth_manager)
     
     if "playlist" in playlist_url:
         playlist_id = playlist_url.split("/")[-1].split("?")[0]
     else:
-        
         raise ValueError("Invalid playlist URL")
 
     tracks = []
@@ -39,23 +37,25 @@ def get_spotify_playlist_tracks(playlist_url):
     while True:
         results = sp.playlist_tracks(playlist_id, offset=offset)
 
-        
-
         for item in results['items']:
             track = item['track']
             if track:
                 name = track.get('name', 'Unknown Track')
-                # Correzione: Se l'artista è None, usa 'Unknown Artist'
                 artists = ', '.join([artist.get('name', 'Unknown Artist') if artist.get('name') else 'Unknown Artist' for artist in track.get('artists', [])])
                 album = track.get('album', {}).get('name', 'Unknown Album')
                 track_number = track.get('track_number', None)
+
+                
+                release_date = track['album'].get('release_date', 'Unknown Year')
+                year = release_date.split("-")[0]  
 
                 if artists:
                     tracks.append({
                         'name': name,
                         'artists': artists,
                         'album': album,
-                        'track_number': track_number
+                        'track_number': track_number,
+                        'year': year  
                     })
             else:
                 print("Track is None, skipping...")
@@ -127,7 +127,7 @@ def download_from_youtube(url, output_folder, track_info):
 def process_track(track, output_folder):
     """Process a single track: search on YouTube, download, and set metadata."""
     try:
-        query = f"{track['name']} {track['artists']} audio"
+        query = f"{track['name']} \"{track['artists']}\""
         print(f"Searching: {query}")
         youtube_url = search_youtube(query)
 
@@ -171,7 +171,11 @@ if __name__ == "__main__":
     tracks = get_spotify_playlist_tracks(playlist_url)
 
     print("\nDownloading tracks...")
-    max_threads = 14
+    max_threads = os.getenv("MAX_THREADS")
+    if max_threads is not None:
+        max_threads = int(max_threads)
+    else:
+        max_threads = 4  
     with ThreadPoolExecutor(max_threads) as executor:
         for track in tracks:
             executor.submit(process_track, track, output_folder)
