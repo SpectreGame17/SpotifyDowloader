@@ -4,6 +4,7 @@ This program enables you to download entire Spotify playlists as MP3 files quick
 - **Multi-threaded Downloads**: Download multiple songs simultaneously by configuring the number of threads, speeding up the process for large playlists.  
 - **Customizable Threads**: Adjust the number of concurrent downloads based on your system's resources.  
 - **Metadata Support**: Each MP3 file is saved with proper metadata (title, artist, album, etc.) for better organization.  
+- **Playlist Update**: If you need to add some tracks from a playlist, just re-enter the link and folder, and the program will download only the new ones.
 
 ## Requirements  
 - Spotify API credentials (Client ID and Client Secret).
