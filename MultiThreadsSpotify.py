@@ -323,7 +323,7 @@ if __name__ == "__main__":
             for track in tracks:
                 executor.submit(process_track, track, output_folder)
 
-        # clear_terminal()
+        clear_terminal()
         print("\nDownload complete!")
 
         # Chiede all'utente se vuole ripetere il processo
