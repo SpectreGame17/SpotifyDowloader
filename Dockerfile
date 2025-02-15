@@ -23,4 +23,4 @@ ENV XDG_CACHE_HOME=/app/yt-cache
 COPY .env .env
 
 # Comando per avviare il programma
-CMD ["python", "SpotifyDowload.py"]
+CMD ["python", "MultiThreadsSpotify.py"]
