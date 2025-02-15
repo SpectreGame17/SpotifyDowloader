@@ -1,6 +1,2 @@
 .env
 .cache
-build/
-dist/
-*.spec
-MultiThreadsSpotify.py
