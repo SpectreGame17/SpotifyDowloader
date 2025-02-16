@@ -501,7 +501,7 @@ def main():
         phase4_verification(output_folder)
 
         #clear_terminal()
-        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "\nDownload complete!")
+        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Download complete!")
         again = download_again = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Do you want to download another item? (y/n): ").strip().lower()
         if again != 'y':
             print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Exiting...")
