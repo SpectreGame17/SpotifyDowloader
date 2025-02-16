@@ -19,11 +19,26 @@ load_dotenv()
 client_id = os.getenv("SPOTIFY_CLIENT_ID")
 client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
 max_threads = int(os.getenv("MAX_THREADS", "4"))
+#codec = os.getenv("PREFERRED_CODEC", "mp3")  # Impostiamo il codec senza il punto
+codec = "mp3" #Il supporto a codec diversi non è al momento dispobile
+codec = '.' + codec if not codec.startswith('.') else codec  # Aggiungiamo il punto se manca
 
 # Lock per operazioni critiche sui file
 file_lock = threading.Lock()
 # Set globale per tracce in elaborazione (chiave: (titolo, artista) in lowercase)
 in_processing = set()
+
+#logger degli eventi per diminuire gli output
+class MyLogger:
+    def debug(self, msg):
+        pass
+    def info(self, msg):
+        pass
+    def warning(self, msg):
+        pass
+    def error(self, msg):
+        pass
+
 
 
 def log_error(message, output_folder):
@@ -79,7 +94,7 @@ def get_spotify_playlist_tracks(playlist_url):
                     'year': year  
                 })
             else:
-                print("Track is None, skipping...")
+                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Track is None, skipping...")
 
         if len(results['items']) < 100:
             break
@@ -156,9 +171,9 @@ def track_already_downloaded(track, output_folder):
     Controlla se un brano è già presente nella cartella, verificando i metadati (titolo e artista).
     Vengono controllati solo i file finali (quelli con metadati).
     """
-    for mp3_file in Path(output_folder).glob("*.mp3"):
+    for file in Path(output_folder).glob(f"*{codec}"):
         try:
-            audio = MP3(str(mp3_file), ID3=EasyID3)
+            audio = MP3(str(file), ID3=EasyID3)
             title = audio.get('title', [None])[0]
             artist = audio.get('artist', [None])[0]
             if title and artist:
@@ -215,19 +230,19 @@ def download_track(track, output_folder):
     """
     key = (track['name'].strip().lower(), track['artists'].strip().lower())
     if key in in_processing or track_already_downloaded(track, output_folder):
-        print(f"Skipping, already exists or in processing: {track['name']} - {track['artists']}")
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Skipping, already exists or in processing: {track['name']} - {track['artists']}")
         return None
 
     in_processing.add(key)
     query = f"{track['name']} \"{track['artists']}\""
-    print(f"Searching: {query}")
+    print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Searching: {query}")
     youtube_url = search_youtube(query, output_folder)
     if not youtube_url:
         log_error(f"Not found on YouTube: {query}", output_folder)
         in_processing.remove(key)
         return None
 
-    print(f"Downloading from: {youtube_url}")
+    print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Downloading from: {youtube_url}")
     temp_name = uuid.uuid4().hex
     temp_output_path = Path(output_folder) / temp_name
     ydl_opts = {
@@ -249,7 +264,7 @@ def download_track(track, output_folder):
         in_processing.remove(key)
         return None
 
-    temp_file = str(temp_output_path) + ".mp3"
+    temp_file = str(temp_output_path) + codec
     if not os.path.exists(temp_file):
         log_error(f"Temporary file not found for {track['name']}", output_folder)
         in_processing.remove(key)
@@ -261,7 +276,7 @@ def download_track(track, output_folder):
 # === FASE 2: Aggiunta metadati ===
 def add_metadata_to_file(temp_file, track_info, output_folder):
     """
-    Aggiunge i metadati al file audio.
+    Aggiunge i metadati al file audio in base al codec scelto.
     Ritorna True se va a buon fine, False altrimenti.
     """
     try:
@@ -272,11 +287,12 @@ def add_metadata_to_file(temp_file, track_info, output_folder):
         if track_info['track_number']:
             audio['tracknumber'] = str(track_info['track_number'])
         audio.save()
-        del audio  # Forza il rilascio della risorsa
+        del audio  # Rilascia la risorsa
         return True
     except Exception as e:
         log_error(f"Error adding metadata for {track_info['name']}: {e}", output_folder)
         return False
+
 
 
 # === FASE 3: Rinomina del file ===
@@ -290,7 +306,7 @@ def rename_file(temp_file, track_info, output_folder):
     """
     final_name = re.sub(r'[\/:*?."<>|]', " ", track_info['name']).strip().rstrip('.')
     final_output_path = Path(output_folder) / final_name
-    final_file = str(final_output_path) + ".mp3"
+    final_file = str(final_output_path) + codec
 
     max_retries = 5
     for attempt in range(max_retries):
@@ -303,26 +319,26 @@ def rename_file(temp_file, track_info, output_folder):
                     alt_final_name = f"{final_name} - {track_info['artists']}"
                     alt_final_name = re.sub(r'[\/:*?."<>|]', " ", alt_final_name).strip().rstrip('.')
                     alt_final_output_path = Path(output_folder) / alt_final_name
-                    alt_final_file = str(alt_final_output_path) + ".mp3"
+                    alt_final_file = str(alt_final_output_path) + codec
                     if not os.path.exists(alt_final_file):
                         os.rename(temp_file, alt_final_file)
                         final_file = alt_final_file
                     else:
                         # Fallback: aggiungi un suffisso numerico
                         i = 1
-                        while os.path.exists(f"{final_output_path}-{i}.mp3"):
+                        while os.path.exists(f"{final_output_path}-{i}{codec}"):
                             i += 1
-                        final_file = f"{final_output_path}-{i}.mp3"
+                        final_file = f"{final_output_path}-{i}{codec}"
                         os.rename(temp_file, final_file)
             break
         except OSError as e:
             if hasattr(e, "winerror") and e.winerror == 32:
-                print(f"File in use, retrying rename for {final_file} (attempt {attempt+1}/{max_retries})")
+                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File in use, retrying rename for {final_file} (attempt {attempt+1}/{max_retries})")
                 time.sleep(0.5)
             else:
                 raise e
     else:
-        print(f"Failed to rename {temp_file} after {max_retries} attempts.")
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Failed to rename {temp_file} after {max_retries} attempts.")
         return None
 
     # Post-rinominazione: controlla che il nome del file corrisponda ai metadati
@@ -334,14 +350,14 @@ def rename_file(temp_file, track_info, output_folder):
             current_name = Path(final_file).stem
             if sanitized_title != current_name:
                 new_final_output_path = Path(output_folder) / sanitized_title
-                new_final_file = str(new_final_output_path) + ".mp3"
+                new_final_file = str(new_final_output_path) + codec
                 if not os.path.exists(new_final_file):
                     os.rename(final_file, new_final_file)
                     final_file = new_final_file
                 else:
-                    print(f"Post-rename target already exists: {new_final_file}. Keeping original file.")
+                    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Post-rename target already exists: {new_final_file}. Keeping original file.")
     except Exception as e:
-        print(f"Error in post-renaming check for {track_info['name']}: {e}")
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error in post-renaming check for {track_info['name']}: {e}")
         error_file = os.path.join(output_folder, "Error.txt")
         with open(error_file, 'a') as file:
             file.write(f"[ERROR] Post-renaming check for {track_info['name']}: {e}\n")
@@ -367,8 +383,8 @@ def phase4_verification(output_folder):
     for file in Path(output_folder).iterdir():
         if not file.is_file():
             continue
-        if file.suffix.lower() != ".mp3":
-            print(f"Deleting file without .mp3 extension: {file}")
+        if file.suffix.lower() == ".part":
+            print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Deleting file without .part extension: {file}")
             try:
                 file.unlink()
             except Exception as e:
@@ -381,11 +397,11 @@ def phase4_verification(output_folder):
                 changed = False
                 if not title:
                     default_title = file.stem
-                    print(f"File {file} missing title. Setting title to '{default_title}'")
+                    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File {file} missing title. Setting title to '{default_title}'")
                     audio['title'] = default_title
                     changed = True
                 if not artist:
-                    print(f"File {file} missing artist. Setting artist to 'Unknown'")
+                    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File {file} missing artist. Setting artist to 'Unknown'")
                     audio['artist'] = "Unknown"
                     changed = True
                 if changed:
@@ -410,20 +426,20 @@ def main():
             os.makedirs(output_folder)
 
         clear_terminal()
-        print(f"The songs will be saved in: {output_folder}")
+        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The songs will be saved in: {output_folder}")
 
         # Estrae le tracce in base al tipo di URL
         if "playlist" in spotify_url:
-            print("Extracting tracks from the playlist...")
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the playlist...")
             tracks = get_spotify_playlist_tracks(spotify_url)
         elif "album" in spotify_url:
-            print("Extracting tracks from the album...")
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the album...")
             tracks = get_spotify_album_tracks(spotify_url)
         elif "track" in spotify_url:
-            print("Extracting track information...")
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting track information...")
             tracks = get_spotify_single_track(spotify_url)
         else:
-            print("Unsupported Spotify URL.")
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Unsupported Spotify URL.")
             continue
 
         # Deduplica le tracce basandosi su (titolo, artista)
@@ -446,10 +462,10 @@ def main():
                     temp_file = future.result()
                     if temp_file:
                         downloaded_items.append({"track": track, "temp_file": temp_file})
-                        print(f"Downloaded: {track['name']} - Temp file: {temp_file}")
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Downloaded: {track['name']} - Temp file: {temp_file}")
                 except Exception as e:
                     log_error(f"Error downloading track {track['name']}: {e}", output_folder)
-                    print(f"Error downloading track {track['name']}: {e}")
+                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error downloading track {track['name']}: {e}")
 
         print("\n=== PHASE 2: Adding metadata ===")
         with ThreadPoolExecutor(max_threads) as executor:
@@ -459,13 +475,13 @@ def main():
                 try:
                     success = future.result()
                     if success:
-                        print(f"Metadata added for: {item['track']['name']}")
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Metadata added for: {item['track']['name']}")
                     else:
                         log_error(f"Error adding metadata for: {item['track']['name']}", output_folder)
-                        print(f"Error adding metadata for: {item['track']['name']}")
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error adding metadata for: {item['track']['name']}")
                 except Exception as e:
                     log_error(f"Error adding metadata for {item['track']['name']}: {e}", output_folder)
-                    print(f"Error adding metadata for {item['track']['name']}: {e}")
+                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error adding metadata for {item['track']['name']}: {e}")
 
         print("\n=== PHASE 3: Renaming files ===")
         with ThreadPoolExecutor(max_threads) as executor:
@@ -474,21 +490,21 @@ def main():
                 item = future_to_item[future]
                 try:
                     final_path = future.result()
-                    print(f"File for {item['track']['name']} renamed to: {final_path}")
+                    print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File for {item['track']['name']} renamed to: {final_path}")
                 except Exception as e:
                     log_error(f"Error renaming file for {item['track']['name']}: {e}", output_folder)
-                    print(f"Error renaming file for {item['track']['name']}: {e}")
+                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error renaming file for {item['track']['name']}: {e}")
                 finally:
                     finalize_track_processing(item["track"])
 
         print("\n=== PHASE 4: Final verification ===")
         phase4_verification(output_folder)
 
-        clear_terminal()
-        print("\nDownload complete!")
-        again = input("Do you want to download another item? (y/n): ").strip().lower()
+        #clear_terminal()
+        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "\nDownload complete!")
+        again = download_again = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Do you want to download another item? (y/n): ").strip().lower()
         if again != 'y':
-            print("Exiting...")
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Exiting...")
             break
 
 
