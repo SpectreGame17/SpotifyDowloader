@@ -8,7 +8,7 @@ This program enables you to download entire Spotify playlists, album or song as 
 
 ## Requirements  
 - Spotify API credentials (Client ID and Client Secret).
-  [spotify.com]https://developer.spotify.com/ 
+  [spotify.com](https://developer.spotify.com/)
 - Internet connection.  
 - Required dependencies (detailed in the setup instructions below).  
 - Python 
@@ -52,19 +52,19 @@ sudo apt install ffmpeg
 1. Clone this repository.
 2. Configure Client Id, Client Secret, and Max Threads in .env file:
   Create a .env file in the same directory as your script and add the following variables
-```env
-CLIENT_ID="your_spotify_client_id"
-CLIENT_SECRET="your_spotify_client_secret"
-MAX_THREADS=14  # Number of simultaneous downloads (adjust based on your PC's capability)
-PREFERRED_CODEC=mp3 #Use only mp3, other codecs are currently not supported due to an issue with a library.
-PREFERRED_QUALITY=192 # 320, 256, 192, 160, 128 , 96, 64
-XDG_CACHE_HOME=./yt-cache
-```
+  ```env
+  CLIENT_ID="your_spotify_client_id"
+  CLIENT_SECRET="your_spotify_client_secret"
+  MAX_THREADS=14  # Number of simultaneous downloads (adjust based on your PC's capability)
+  PREFERRED_CODEC=mp3 #Use only mp3, other codecs are currently not supported due to an issue with a library.
+  PREFERRED_QUALITY=192 # 320, 256, 192, 160, 128 , 96, 64
+  XDG_CACHE_HOME=./yt-cache
+  ```
 3. Run the program and enjoy your MP3 downloads!
-    -You can simply open it in Visual Studio and run it in a dedicated terminal.
-    -You can create a spotifydl.bat file like this:
-    ```bat
-    @echo off
-    python "C:\Scripts\SpotifyDowloader\MultiThreadsSpotify.py" 
-    ```
-    Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type "spotifydl" in the terminal to start the program.
+  -You can simply open it in Visual Studio and run it in a dedicated terminal.
+  -You can create a spotifydl.bat file like this:
+  ```bat
+  @echo off
+  python "C:\Scripts\SpotifyDowloader\MultiThreadsSpotify.py" 
+  ```
+  Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type "spotifydl" in the terminal to start the program.
