@@ -8,9 +8,11 @@ This program enables you to download entire Spotify playlists, album or song as 
 
 ## Requirements  
 - Spotify API credentials (Client ID and Client Secret).
-  https://developer.spotify.com/ 
+  [spotify.com]https://developer.spotify.com/ 
 - Internet connection.  
 - Required dependencies (detailed in the setup instructions below).  
+- Python 
+  [python.org](https://www.python.org/)
 
 ## Dependencies  
 
@@ -58,4 +60,11 @@ PREFERRED_CODEC=mp3 #Use only mp3, other codecs are currently not supported due 
 PREFERRED_QUALITY=192 # 320, 256, 192, 160, 128 , 96, 64
 XDG_CACHE_HOME=./yt-cache
 ```
-3. Run the program and enjoy your MP3 downloads!   
+3. Run the program and enjoy your MP3 downloads!
+    -You can simply open it in Visual Studio and run it in a dedicated terminal.
+    -You can create a spotifydl.bat file like this:
+    ```bat
+    @echo off
+    python "C:\Scripts\SpotifyDowloader\MultiThreadsSpotify.py" 
+    ```
+    Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type "spotifydl" in the terminal to start the program.
