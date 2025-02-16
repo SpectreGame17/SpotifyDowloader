@@ -401,8 +401,8 @@ def phase4_verification(output_folder):
 # === MAIN ===
 def main():
     while True:
-        spotify_url = input("Enter the Spotify link: ").strip()
-        output_folder = input("Enter the destination folder: ").strip()
+        spotify_url = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the Spotify link: ").strip()
+        output_folder = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the destination folder: ").strip()
 
         if not output_folder:
             output_folder = "/app/downloads"
