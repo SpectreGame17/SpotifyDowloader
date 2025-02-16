@@ -62,9 +62,9 @@ sudo apt install ffmpeg
   ```
 3. Run the program and enjoy your MP3 downloads!
   -You can simply open it in Visual Studio and run it in a dedicated terminal.
-  -You can create a spotifydl.bat file like this:
+  -You can create a `spotifydl.bat` file like this:
   ```bat
   @echo off
   python "C:\Scripts\SpotifyDowloader\MultiThreadsSpotify.py" 
   ```
-  Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type "spotifydl" in the terminal to start the program.
+  Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type `spotifydl` in the terminal to start the program.
