@@ -65,6 +65,13 @@ sudo apt install ffmpeg
   -You can create a `spotifydl.bat` file like this:
   ```bat
   @echo off
-  python "C:\Scripts\SpotifyDowloader\MultiThreadsSpotify.py" 
+  cd /d "C:\Scripts\SpotifyDowloader"
+  setlocal
+  if exist .env (
+    for /f "usebackq delims=" %%a in (".env") do set %%a
+  )
+  python "MultiThreadsSpotify.py"
+  endlocal
+
   ```
   Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type `spotifydl` in the terminal to start the program.

@@ -2,6 +2,7 @@ import os
 import re
 import uuid
 import threading
+import shutil
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
