@@ -56,5 +56,6 @@ CLIENT_SECRET="your_spotify_client_secret"
 MAX_THREADS=14  # Number of simultaneous downloads (adjust based on your PC's capability)
 PREFERRED_CODEC=mp3 #Use only mp3, other codecs are currently not supported due to an issue with a library.
 PREFERRED_QUALITY=192 # 320, 256, 192, 160, 128 , 96, 64
+XDG_CACHE_HOME=./yt-cache
 ```
 3. Run the program and enjoy your MP3 downloads!   
