@@ -29,16 +29,6 @@ file_lock = threading.Lock()
 # Set globale per tracce in elaborazione (chiave: (titolo, artista) in lowercase)
 in_processing = set()
 
-#logger degli eventi per diminuire gli output
-class MyLogger:
-    def debug(self, msg):
-        pass
-    def info(self, msg):
-        pass
-    def warning(self, msg):
-        pass
-    def error(self, msg):
-        pass
 
 
 
