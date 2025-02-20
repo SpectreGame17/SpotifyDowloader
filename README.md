@@ -83,4 +83,5 @@ sudo apt install ffmpeg
 - **"update"**: Automatically updates all downloaded playlists with the latest changes.
 - **"addMeta"**: Add the metadata of a Spotify song to a specific file.
 - **"exit"**: Closes the program.
+
 It takes some time for the program to find one or more songs (depending on your connection, whether the song is difficult to find, has restrictions, or is not very popular). Therefore, even if you see warnings related to the cache or other information, always wait for a final output, either an error or a success message.
