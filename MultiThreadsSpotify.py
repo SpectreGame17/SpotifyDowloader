@@ -366,7 +366,6 @@ def finalize_track_processing(track):
 def phase4_verification(output_folder):
     """
     Controlla tutti i file nella cartella di output:
-      - Elimina i file senza estensione .mp3.
       - Per ogni file .mp3, se mancano i metadati (title o artist), li imposta:
           * Usa il nome del file come title.
           * Imposta "Unknown" come artist se mancante.
@@ -374,35 +373,32 @@ def phase4_verification(output_folder):
     for file in Path(output_folder).iterdir():
         if not file.is_file():
             continue
-        if file.suffix.lower() == ".part":
-            print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Deleting file without .part extension: {file}")
-            try:
-                file.unlink()
-            except Exception as e:
-                log_error(f"Error deleting file {file}: {e}", output_folder)
-        else:
-            try:
-                audio = MP3(str(file), ID3=EasyID3)
-                title = audio.get('title', [None])[0]
-                artist = audio.get('artist', [None])[0]
-                changed = False
-                if not title:
-                    default_title = file.stem
-                    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File {file} missing title. Setting title to '{default_title}'")
-                    audio['title'] = default_title
-                    changed = True
-                if not artist:
-                    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File {file} missing artist. Setting artist to 'Unknown'")
-                    audio['artist'] = "Unknown"
-                    changed = True
-                if changed:
-                    audio.save()
-            except Exception as e:
-                log_error(f"Error processing file {file}: {e}", output_folder)
-                try:
-                    file.unlink()
-                except Exception as ex:
-                    log_error(f"Error deleting file {file}: {ex}", output_folder)
+
+        # Processa solo i file con estensione .mp3
+        if file.suffix.lower() != ".mp3":
+            continue
+
+        try:
+            audio = MP3(str(file), ID3=EasyID3)
+            title = audio.get('title', [None])[0]
+            artist = audio.get('artist', [None])[0]
+            changed = False
+            if not title:
+                default_title = file.stem
+                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL +
+                      f"File {file} missing title. Setting title to '{default_title}'")
+                audio['title'] = default_title
+                changed = True
+            if not artist:
+                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL +
+                      f"File {file} missing artist. Setting artist to 'Unknown'")
+                audio['artist'] = "Unknown"
+                changed = True
+            if changed:
+                audio.save()
+        except Exception as e:
+            log_error(f"Error processing file {file}: {e}", output_folder)
+
 
 
 # === MAIN ===
