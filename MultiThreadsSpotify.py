@@ -23,7 +23,8 @@ max_threads = int(os.getenv("MAX_THREADS", "4"))
 #codec = os.getenv("PREFERRED_CODEC", "mp3")  # Impostiamo il codec senza il punto
 codec = "mp3" #Il supporto a codec diversi non è al momento dispobile
 codec = '.' + codec if not codec.startswith('.') else codec  # Aggiungiamo il punto se manca
-
+#set dati file scaricati
+DATA_FILE = "data.dat"
 # Lock per operazioni critiche sui file
 file_lock = threading.Lock()
 # Set globale per tracce in elaborazione (chiave: (titolo, artista) in lowercase)
@@ -399,100 +400,231 @@ def phase4_verification(output_folder):
         except Exception as e:
             log_error(f"Error processing file {file}: {e}", output_folder)
 
+def spotifydl(spotify_url, output_folder, flag):
+    
+            if not output_folder:
+                output_folder = "/app/downloads"
+            if not os.path.exists(output_folder):
+                os.makedirs(output_folder)
 
+            clear_terminal()
+            
+            # Estrae le tracce in base al tipo di URL e ne verifica la correttezza
+            if "playlist" in spotify_url:
+                print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the playlist...")
+                tracks = get_spotify_playlist_tracks(spotify_url)
+                if flag == 1:
+                    save_entry(spotify_url, output_folder)
+            elif "album" in spotify_url:
+                print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the album...")
+                tracks = get_spotify_album_tracks(spotify_url)
+            elif "track" in spotify_url:
+                print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting track information...")
+                tracks = get_spotify_single_track(spotify_url)
+            else:
+                print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Unsupported Spotify URL.")
+                return #in caso di errore esce dalla funzione
+                
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The songs will be saved in: {output_folder}")
+
+            # Deduplica le tracce basandosi su (titolo, artista)
+            unique_tracks = []
+            seen = set()
+            for track in tracks:
+                key = (track['name'].strip().lower(), track['artists'].strip().lower())
+                if key not in seen:
+                    unique_tracks.append(track)
+                    seen.add(key)
+            tracks = unique_tracks
+
+            print("\n=== PHASE 1: Download tracks ===")
+            downloaded_items = []  # Lista di dict: { 'track': ..., 'temp_file': ... }
+            with ThreadPoolExecutor(max_threads) as executor:
+                future_to_track = {executor.submit(download_track, track, output_folder): track for track in tracks}
+                for future in as_completed(future_to_track):
+                    track = future_to_track[future]
+                    try:
+                        temp_file = future.result()
+                        if temp_file:
+                            downloaded_items.append({"track": track, "temp_file": temp_file})
+                            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Downloaded: {track['name']} - Temp file: {temp_file}")
+                    except Exception as e:
+                        log_error(f"Error downloading track {track['name']}: {e}", output_folder)
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error downloading track {track['name']}: {e}")
+
+            print("\n=== PHASE 2: Adding metadata ===")
+            with ThreadPoolExecutor(max_threads) as executor:
+                future_to_item = {executor.submit(add_metadata_to_file, item["temp_file"], item["track"], output_folder): item for item in downloaded_items}
+                for future in as_completed(future_to_item):
+                    item = future_to_item[future]
+                    try:
+                        success = future.result()
+                        if success:
+                            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Metadata added for: {item['track']['name']}")
+                        else:
+                            log_error(f"Error adding metadata for: {item['track']['name']}", output_folder)
+                            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error adding metadata for: {item['track']['name']}")
+                    except Exception as e:
+                        log_error(f"Error adding metadata for {item['track']['name']}: {e}", output_folder)
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error adding metadata for {item['track']['name']}: {e}")
+
+            print("\n=== PHASE 3: Renaming files ===")
+            with ThreadPoolExecutor(max_threads) as executor:
+                future_to_item = {executor.submit(rename_file, item["temp_file"], item["track"], output_folder): item for item in downloaded_items}
+                for future in as_completed(future_to_item):
+                    item = future_to_item[future]
+                    try:
+                        final_path = future.result()
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File for {item['track']['name']} renamed to: {final_path}")
+                    except Exception as e:
+                        log_error(f"Error renaming file for {item['track']['name']}: {e}", output_folder)
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error renaming file for {item['track']['name']}: {e}")
+                    finally:
+                        finalize_track_processing(item["track"])
+
+            print("\n=== PHASE 4: Final verification ===")
+            phase4_verification(output_folder)
+            clear_terminal()
+            
+
+def load_entries():
+    """Legge tutte le righe del file e salva spotify_url e output_folder in due liste."""
+    spotify_urls = []
+    output_folders = []
+
+    if not os.path.exists(DATA_FILE):
+        return spotify_urls, output_folders  # Se il file non esiste, ritorna liste vuote
+
+    with open(DATA_FILE, "r") as file:
+        for line in file:
+            parts = line.strip().split(" ", 1)  # Divide in due parti: URL e cartella
+            if len(parts) == 2:
+                spotify_urls.append(parts[0])
+                output_folders.append(parts[1])
+
+    return spotify_urls, output_folders
+
+def clean_entries():
+    """Rimuove dal file data.dat le voci con cartelle non più esistenti."""
+    spotify_urls, output_folders = load_entries()
+    
+    # Filtra solo gli elementi con una cartella esistente
+    valid_entries = [(url, folder) for url, folder in zip(spotify_urls, output_folders) if os.path.exists(folder)]
+
+    # Riscrive il file data.dat con solo le voci valide
+    with open(DATA_FILE, "w") as file:
+        for url, folder in valid_entries:
+            file.write(f"{url} {folder}\n")
+
+    return valid_entries  # Ritorna la lista pulita
+
+
+def save_entry(spotify_url, output_folder):
+    """Scrive spotify_url e output_folder nel file data.dat, aggiungendo alla fine se esiste già."""
+    with open(DATA_FILE, "a") as file:
+        file.write(f"{spotify_url} {output_folder}\n")
+
+def has_content(file):
+    """Restituisce 1 se il file data.dat contiene dati, altrimenti 0."""
+    if not os.path.exists(file):
+        return 0  # Il file non esiste, quindi è vuoto
+
+    # Controlla se il file ha contenuto
+    with open(file, "r") as file:
+        for line in file:
+            if line.strip():  # Se c'è almeno una riga non vuota
+                return 1
+    return 3  # Il file è vuoto
+
+
+
+def update():
+
+    result = has_content(DATA_FILE)
+    if result == 1:
+        valid_entries = clean_entries()
+        for url, folder in valid_entries:
+            spotifydl(url, folder, 0)
+        return
+    elif result == 3:
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The playlist database is corrupted.")
+    elif result == 0:
+        print(Fore.RYELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
+    else:
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Unexpected error.")
+
+def addmeta():
+    # Richiedi il percorso del file all'utente
+            file_path = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the file path: ").strip()
+
+            # Rimuovi eventuali virgolette iniziali e finali (sia " che ')
+            if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                file_path = file_path[1:-1]
+
+            # Controlla se il file esiste
+            if os.path.exists(file_path): 
+                # Richiedi il link Spotify
+                spotify_url = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the Spotify link: ").strip()
+                # Rimuovi virgolette se presenti
+                if (spotify_url.startswith('"') and spotify_url.endswith('"')) or (spotify_url.startswith("'") and spotify_url.endswith("'")):
+                    spotify_url = spotify_url[1:-1]
+
+                # Ottieni il percorso della cartella in cui si trova il file
+                directory_path = os.path.dirname(file_path)
+                
+                # Se il link contiene "track", procedi con l'estrazione dei metadati
+                if "track" in spotify_url:
+                    print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting track information...")
+                    track_info = get_spotify_single_track(spotify_url)
+                    
+                    # Passa il percorso completo del file a add_metadata_to_file
+                    if add_metadata_to_file(file_path, track_info[0], directory_path):
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Metadata added successfully.")
+                    else:
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Failed to add metadata.")
+                else:
+                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{spotify_url} is not a valid track link.")
+            else:
+                print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{file_path} does not exist")      
+  
 
 # === MAIN ===
 def main():
+    print("Welcome to SpotifyDl. To see the available commands, type help")
     while True:
-        spotify_url = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the Spotify link: ").strip()
-        output_folder = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the destination folder: ").strip()
+        rss = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter command: ").strip().lower()
+        if rss == "download" :
+            spotify_url = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the Spotify link: ").strip()
+            output_folder = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the destination folder: ").strip()
+            spotifydl(spotify_url, output_folder, 1)
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Download complete!")
+            log_file = os.path.join(output_folder, "log.txt")
+            if has_content(log_file) == 1:
+                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"An error may have occurred. Please check the log file. If there are incorrect or incomplete files, delete the file and enter the \\update command to attempt to repair the playlist. If the error persists, the track cannot be downloaded.")
+        
+        elif rss == "help":
+            clear_terminal()
+            commands = {
+               "download": "Download any item from Spotify.",
+                "update": "Automatically updates all downloaded playlists with the latest changes.",
+                "addMeta": "Add the metadata of a Spotify song to a specific file",
+                "exit": "Closes the program."
+                }
 
-        if not output_folder:
-            output_folder = "/app/downloads"
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
+            print("Comandi disponibili:")
+            for command, description in commands.items():
+                print(f"- {command}: {description}")
 
-        clear_terminal()
-        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The songs will be saved in: {output_folder}")
-
-        # Estrae le tracce in base al tipo di URL
-        if "playlist" in spotify_url:
-            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the playlist...")
-            tracks = get_spotify_playlist_tracks(spotify_url)
-        elif "album" in spotify_url:
-            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the album...")
-            tracks = get_spotify_album_tracks(spotify_url)
-        elif "track" in spotify_url:
-            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting track information...")
-            tracks = get_spotify_single_track(spotify_url)
+        elif rss == "exit":
+            return
+        elif rss == "update":
+            update()
+            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Update complete!")
+        elif rss == "addmeta":
+            addmeta()
         else:
-            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Unsupported Spotify URL.")
-            continue
-
-        # Deduplica le tracce basandosi su (titolo, artista)
-        unique_tracks = []
-        seen = set()
-        for track in tracks:
-            key = (track['name'].strip().lower(), track['artists'].strip().lower())
-            if key not in seen:
-                unique_tracks.append(track)
-                seen.add(key)
-        tracks = unique_tracks
-
-        print("\n=== PHASE 1: Download tracks ===")
-        downloaded_items = []  # Lista di dict: { 'track': ..., 'temp_file': ... }
-        with ThreadPoolExecutor(max_threads) as executor:
-            future_to_track = {executor.submit(download_track, track, output_folder): track for track in tracks}
-            for future in as_completed(future_to_track):
-                track = future_to_track[future]
-                try:
-                    temp_file = future.result()
-                    if temp_file:
-                        downloaded_items.append({"track": track, "temp_file": temp_file})
-                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Downloaded: {track['name']} - Temp file: {temp_file}")
-                except Exception as e:
-                    log_error(f"Error downloading track {track['name']}: {e}", output_folder)
-                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error downloading track {track['name']}: {e}")
-
-        print("\n=== PHASE 2: Adding metadata ===")
-        with ThreadPoolExecutor(max_threads) as executor:
-            future_to_item = {executor.submit(add_metadata_to_file, item["temp_file"], item["track"], output_folder): item for item in downloaded_items}
-            for future in as_completed(future_to_item):
-                item = future_to_item[future]
-                try:
-                    success = future.result()
-                    if success:
-                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Metadata added for: {item['track']['name']}")
-                    else:
-                        log_error(f"Error adding metadata for: {item['track']['name']}", output_folder)
-                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error adding metadata for: {item['track']['name']}")
-                except Exception as e:
-                    log_error(f"Error adding metadata for {item['track']['name']}: {e}", output_folder)
-                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error adding metadata for {item['track']['name']}: {e}")
-
-        print("\n=== PHASE 3: Renaming files ===")
-        with ThreadPoolExecutor(max_threads) as executor:
-            future_to_item = {executor.submit(rename_file, item["temp_file"], item["track"], output_folder): item for item in downloaded_items}
-            for future in as_completed(future_to_item):
-                item = future_to_item[future]
-                try:
-                    final_path = future.result()
-                    print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File for {item['track']['name']} renamed to: {final_path}")
-                except Exception as e:
-                    log_error(f"Error renaming file for {item['track']['name']}: {e}", output_folder)
-                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Error renaming file for {item['track']['name']}: {e}")
-                finally:
-                    finalize_track_processing(item["track"])
-
-        print("\n=== PHASE 4: Final verification ===")
-        phase4_verification(output_folder)
-
-        #clear_terminal()
-        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Download complete!")
-        again = download_again = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Do you want to download another item? (y/n): ").strip().lower()
-        if again != 'y':
-            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Exiting...")
-            break
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{rss} is not a command")
+            
 
 
 if __name__ == "__main__":

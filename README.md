@@ -47,7 +47,7 @@ sudo apt install ffmpeg
 - Add FFmpeg to your system's PATH environment variable (refer to the official guide for 
   instructions).
   
-## Usage  
+## Installation  
  
 1. Clone this repository.
 2. Configure Client Id, Client Secret, and Max Threads in .env file:
@@ -75,3 +75,12 @@ sudo apt install ffmpeg
 
   ```
   Remember, this is an example; your path may be different; then you need to add the path you set to the system's PATH environment variable, and you will be able to simply type `spotifydl` in the terminal to start the program.
+
+  ## Usage
+  Once the Python script is installed correctly, simply run it. For help, you can type `help`. The available commands are as follows and perform the corresponding actions:
+
+- **"download"**: Download any item from Spotify.
+- **"update"**: Automatically updates all downloaded playlists with the latest changes.
+- **"addMeta"**: Add the metadata of a Spotify song to a specific file.
+- **"exit"**: Closes the program.
+It takes some time for the program to find one or more songs (depending on your connection, whether the song is difficult to find, has restrictions, or is not very popular). Therefore, even if you see warnings related to the cache or other information, always wait for a final output, either an error or a success message.
