@@ -20,7 +20,7 @@ load_dotenv()
 client_id = os.getenv("SPOTIFY_CLIENT_ID")
 client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
 max_threads = int(os.getenv("MAX_THREADS", "4"))
-#codec = os.getenv("PREFERRED_CODEC", "mp3")  # Impostiamo il codec senza il punto
+
 codec = "mp3" #Il supporto a codec diversi non è al momento dispobile
 codec = '.' + codec if not codec.startswith('.') else codec  # Aggiungiamo il punto se manca
 #set dati file scaricati
@@ -241,7 +241,7 @@ def download_track(track, output_folder):
         'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': os.getenv("PREFERRED_CODEC", "mp3"),
+            'preferredcodec': "mp3",
             'preferredquality': os.getenv("PREFERRED_QUALITY", "192"),
         }],
         'outtmpl': str(temp_output_path),
@@ -537,7 +537,6 @@ def has_content(file):
     return 3  # Il file è vuoto
 
 
-
 def update():
 
     result = has_content(DATA_FILE)
@@ -586,7 +585,6 @@ def addmeta():
                     print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{spotify_url} is not a valid track link.")
             else:
                 print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{file_path} does not exist")      
-  
 
 # === MAIN ===
 def main():
@@ -625,7 +623,6 @@ def main():
         else:
             print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{rss} is not a command")
             
-
 
 if __name__ == "__main__":
     main()

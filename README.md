@@ -2,7 +2,7 @@ This program enables you to download entire Spotify playlists, album or song as 
 
 ## Features  
 - **Multi-threaded Downloads**: Download multiple songs simultaneously by configuring the number of threads, speeding up the process for large playlists.  
-- **Customizable Coded**: Customizable music format and quality (*Currently unavailable*).  
+- **Customizable Coded**: Customizable music quality.  
 - **Metadata Support**: Each MP3 file is saved with proper metadata (title, artist, album, etc.) for better organization.  
 - **Playlist Update**: If you need to add some tracks from a playlist, just re-enter the link and folder, and the program will download only the new ones.
 
@@ -56,7 +56,6 @@ sudo apt install ffmpeg
   CLIENT_ID="your_spotify_client_id"
   CLIENT_SECRET="your_spotify_client_secret"
   MAX_THREADS=14  # Number of simultaneous downloads (adjust based on your PC's capability)
-  PREFERRED_CODEC=mp3 #Use only mp3, other codecs are currently not supported due to an issue with a library.
   PREFERRED_QUALITY=192 # 320, 256, 192, 160, 128 , 96, 64
   XDG_CACHE_HOME=./yt-cache
   ```
