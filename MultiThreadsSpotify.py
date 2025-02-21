@@ -1,39 +1,48 @@
-import os
-import re
-import uuid
-import threading
-import shutil
-import sys
-import time
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# Importazioni della Libreria Standard
+import os  # Per interagire con il sistema operativo (es. gestione file, variabili d'ambiente).
+import re  # Per le espressioni regolari, utili per il matching di pattern nelle stringhe.
+import uuid  # Per generare identificatori unici (ad esempio, per creare nomi file univoci).
+import threading  # Per lavorare con i thread in applicazioni multithread.
+import shutil  # Per operazioni sui file come copiare, spostare ed eliminare file.
+import sys  # Per interagire con il sistema e gestire gli argomenti da riga di comando o terminare il programma.
+import time  # Per operazioni legate al tempo (ad esempio, mettere in pausa il programma, misurare il tempo).
+from pathlib import Path  # Per gestire e manipolare i percorsi dei file in modo più comodo.
+from concurrent.futures import ThreadPoolExecutor, as_completed  # Per eseguire operazioni in parallelo usando thread (ThreadPoolExecutor) e gestire i risultati (as_completed).
 
-import spotipy
-import yt_dlp
-from spotipy.oauth2 import SpotifyClientCredentials
-from dotenv import load_dotenv
-from mutagen.easyid3 import EasyID3
-from mutagen.mp3 import MP3
-from colorama import Fore, Style
+# Importazioni di Librerie di Terze Parti
+import spotipy  # Per interagire con l'API Web di Spotify, principalmente per ottenere informazioni su tracce e playlist.
+import yt_dlp  # Una libreria per il download di contenuti da YouTube e altre piattaforme.
+from spotipy.oauth2 import SpotifyClientCredentials  # Per gestire l'autenticazione di Spotify usando le credenziali client.
+from dotenv import load_dotenv  # Per caricare variabili d'ambiente da un file .env, utile per memorizzare dati sensibili come le API key.
+from mutagen.easyid3 import EasyID3  # Per leggere e scrivere metadati (tag ID3) nei file MP3.
+from mutagen.mp3 import MP3  # Per lavorare con file MP3 (es. ottenere proprietà come la durata).
+from colorama import Fore, Style  # Per colorare il testo nel terminale e applicare stili (utile per formattare l'output nelle CLI).
 
 
+#Variabili globali rigurdanti la cartella dell'applicazione
 APP_NAME = "SpotifyDl"
 DEFAULT_ENV_NAME = ".env"
 CONFIG_FOLDER = os.path.join(os.path.expanduser("~"), f".{APP_NAME}")
 ENV_PATH = os.path.join(CONFIG_FOLDER, DEFAULT_ENV_NAME)
 
+#Controlla se la cartella della configurazione iniziale esiste
 def ensure_config_directory():
     if not os.path.exists(CONFIG_FOLDER):
         os.makedirs(CONFIG_FOLDER)
         print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Configuration folder created: {CONFIG_FOLDER}")
-
+#crea il file env per la prima esecuzione del programma con tutte le impostazioni da modificare 
 def create_env_file():
+
+    #Chiede gli input all'utente 
     print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f".env file not found. Creating a new one.")
-    spotify_client_id = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_ID: ").strip()
+    spotify_client_id = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_ID: ").strip() #mi assicuro non ci siano spazi indesiderati
     spotify_client_secret = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_SECRET: ").strip()
     max_threads = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter MAX_THREADS: ").strip()
     preferred_quality = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter PREFERRED_QUALITY: ").strip()
     cache_yt = os.path.join(CONFIG_FOLDER, "yt-cache")
+
+    #Compila ciò che va scritto nel .env
+
     env_content = f"""
 SPOTIFY_CLIENT_ID={spotify_client_id}
 SPOTIFY_CLIENT_SECRET={spotify_client_secret}
@@ -42,17 +51,18 @@ PREFERRED_QUALITY={preferred_quality}
 XDG_CACHE_HOME={cache_yt}
 """
     
-    with open(ENV_PATH, "w") as f:
+    with open(ENV_PATH, "w") as f: #crea il .env se manca e lo riempie con ciò di cui ha bisogno per far funzionare il programma 
         f.write(env_content.strip())
     print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f".env file created at {ENV_PATH}")
 
+#funzione per pulire il terminale, dovrebbe funzionare sia su WIN sia su MACOS
 def clear_terminal():
     """Pulisce il terminale a seconda del sistema operativo."""
     if os.name == 'nt':
         os.system('cls')
     else:
         os.system('clear')
-
+#Controla se FFmpeg è installato correttamente nel sistema
 def check_ffmpeg():
     if shutil.which("ffmpeg") is None:
         print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"FFmpeg is not installed or not in the PATH.")
@@ -63,13 +73,13 @@ def check_ffmpeg():
         print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"FFmpeg is  installed in the PATH.")
         clear_terminal()
 
-# Carica le variabili d'ambiente dal file .env
+#Controlla se esiste un file .env e si prepara a caricarne le variabili
 ensure_config_directory()
 if os.path.exists(ENV_PATH):
     print(f"File .env trovato in {ENV_PATH}. Caricamento...")
 else:
     create_env_file()
-
+# Carica le variabili d'ambiente dal file .env
 load_dotenv(ENV_PATH, override=True)
 client_id = os.getenv("SPOTIFY_CLIENT_ID")
 client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
@@ -77,9 +87,12 @@ max_threads = int(os.getenv("MAX_THREADS", "4"))
 print("Configurazione caricata.")
 clear_terminal()
 
+#---INIZIO CODICE VECCHIO---               Questa parte del codice forza l'utilizzo del file mp3 in quanto ci sono dei problemi nell'implementare altri tipi di file.
 codec = "mp3" #Il supporto a codec diversi non è al momento dispobile
 codec = '.' + codec if not codec.startswith('.') else codec  # Aggiungiamo il punto se manca
-#set dati file scaricati
+#---FINE CODICE VECCHIO--- 
+
+#set dati file scaricati, una sorta di database delle playlist scaricate
 DATA_FILE = os.path.join(CONFIG_FOLDER, "data.dat")
 
 # Lock per operazioni critiche sui file
@@ -89,7 +102,7 @@ in_processing = set()
 
 
 
-
+#è la funzione che ha il compito di scrivere i log sui file, è scritta in questo modo per proteggersi da eventuali problemi di accessi di più threads al file contemporaneamente
 def log_error(message, output_folder):
     """Scrive un messaggio di errore nel file log.txt nella cartella di output."""
     log_file = os.path.join(output_folder, "log.txt")
@@ -97,7 +110,7 @@ def log_error(message, output_folder):
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
 
-
+#Funzione che si occupa di prendere le informazioni della playlist
 def get_spotify_playlist_tracks(playlist_url):
     """Ottiene la lista dei brani da una playlist di Spotify."""
     auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
@@ -143,7 +156,7 @@ def get_spotify_playlist_tracks(playlist_url):
 
     return tracks
 
-
+#Funzione che si occupa di prendere le informazioni degli album
 def get_spotify_album_tracks(album_url):
     """Ottiene la lista dei brani da un album di Spotify."""
     auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
@@ -176,7 +189,7 @@ def get_spotify_album_tracks(album_url):
         })
     return tracks
 
-
+#Funzione che si occupa di prendere le informazioni di una singola traccia
 def get_spotify_single_track(track_url):
     """Ottiene le informazioni di un singolo brano di Spotify."""
     auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
@@ -206,7 +219,7 @@ def get_spotify_single_track(track_url):
         'year': year  
     }]
 
-
+#Funzione di supporto per tutto quello che è gia stato scaricato
 def track_already_downloaded(track, output_folder):
     """
     Controlla se un brano è già presente nella cartella, verificando i metadati (titolo e artista).
@@ -224,7 +237,7 @@ def track_already_downloaded(track, output_folder):
             continue
     return False
 
-
+#Funzione nella quale avviene la composizione della query per ricercare le canzoni
 def search_youtube(query, output_folder):
     """
     Cerca un video su YouTube utilizzando yt-dlp.
@@ -269,6 +282,7 @@ def download_track(track, output_folder):
     Scarica il brano da YouTube e restituisce il percorso del file temporaneo.
     Se il brano è già presente (verificato sui file finali) o in elaborazione, ritorna None.
     """
+    #Il codice verifica se una traccia è già in fase di elaborazione o se è stata scaricata. Se sì, la salta. Altrimenti, crea una query di ricerca su YouTube per la traccia e l'artista. Se non trova il video su YouTube, registra l'errore e continua.
     key = (track['name'].strip().lower(), track['artists'].strip().lower())
     if key in in_processing or track_already_downloaded(track, output_folder):
         print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Skipping, already exists or in processing: {track['name']} - {track['artists']}")
@@ -290,7 +304,7 @@ def download_track(track, output_folder):
         'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': "mp3",
+            'preferredcodec': "mp3", #hardcoded mp3 file format, si come ho problemi con il supporto di altri tipi di file
             'preferredquality': os.getenv("PREFERRED_QUALITY", "192"),
         }],
         'outtmpl': str(temp_output_path),
@@ -299,7 +313,7 @@ def download_track(track, output_folder):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([youtube_url])
+            ydl.download([youtube_url]) #qui avviene l'effettivo download delle tracce
     except Exception as e:
         log_error(f"Download error for {track['name']}: {e}", output_folder)
         in_processing.remove(key)
@@ -449,6 +463,7 @@ def phase4_verification(output_folder):
         except Exception as e:
             log_error(f"Error processing file {file}: {e}", output_folder)
 
+#si occupa del comando download
 def spotifydl(spotify_url, output_folder, flag):
     
             if not output_folder:
@@ -553,6 +568,7 @@ def load_entries():
 
     return spotify_urls, output_folders
 
+#La funzione ha lo scopo di assicurarsi che non ci siano ripetizioni in data.dat
 def clean_entries():
     """Rimuove dal file data.dat le voci con cartelle non più esistenti."""
     spotify_urls, output_folders = load_entries()
@@ -567,9 +583,9 @@ def clean_entries():
 
     return valid_entries  # Ritorna la lista pulita
 
-
+#Scrive spotify_url e output_folder nel file data.dat, aggiungendo alla fine se esiste già. 
 def save_entry(spotify_url, output_folder):
-    """Scrive spotify_url e output_folder nel file data.dat, aggiungendo alla fine se esiste già."""
+    
     with open(DATA_FILE, "a") as file:
         file.write(f"{spotify_url} {output_folder}\n")
 
@@ -585,7 +601,7 @@ def has_content(file):
                 return 1
     return 3  # Il file è vuoto
 
-
+#si occupa del comando update
 def update():
 
     result = has_content(DATA_FILE)
@@ -600,7 +616,7 @@ def update():
         print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
     else:
         print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Unexpected error.")
-
+#si occupa del comando addmeta
 def addmeta():
     # Richiedi il percorso del file all'utente
             file_path = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the file path: ").strip()
@@ -634,7 +650,7 @@ def addmeta():
                     print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{spotify_url} is not a valid track link.")
             else:
                 print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{file_path} does not exist")      
-
+#si occupa del comando settings
 def settings():
     sure = input(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Are you sure you want to modify the settings? You will have to overwrite them all at once, including the Spotify ID and Secret.(y/n): ").lower()
     if sure == 'y':
@@ -696,4 +712,4 @@ def main():
             
 
 if __name__ == "__main__":
-    main()
+    main() #si assicura sia l'utente ad aprire lo script
