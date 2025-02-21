@@ -15,16 +15,62 @@ from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 from colorama import Fore, Style
 
+
+APP_NAME = "SpotifyDl"
+DEFAULT_ENV_NAME = ".env"
+CONFIG_FOLDER = os.path.join(os.path.expanduser("~"), f".{APP_NAME}")
+ENV_PATH = os.path.join(CONFIG_FOLDER, DEFAULT_ENV_NAME)
+
+def ensure_config_directory():
+    if not os.path.exists(CONFIG_FOLDER):
+        os.makedirs(CONFIG_FOLDER)
+        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Configuration folder created: {CONFIG_FOLDER}")
+
+def create_env_file():
+    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f".env file not found. Creating a new one.")
+    spotify_client_id = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_ID: ")
+    spotify_client_secret = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_SECRET: ")
+    max_threads = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter MAX_THREADS: ")
+    preferred_quality = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter PREFERRED_QUALITY: ")
+    
+    env_content = f"""
+SPOTIFY_CLIENT_ID={spotify_client_id}
+SPOTIFY_CLIENT_SECRET={spotify_client_secret}
+MAX_THREADS={max_threads}
+PREFERRED_QUALITY={preferred_quality}
+XDG_CACHE_HOME="$CONFIG_FOLDER/yt-cache"
+"""
+    
+    with open(ENV_PATH, "w") as f:
+        f.write(env_content.strip())
+    print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f".env file created at {ENV_PATH}")
+
+def clear_terminal():
+    """Pulisce il terminale a seconda del sistema operativo."""
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        os.system('clear')
+
 # Carica le variabili d'ambiente dal file .env
-load_dotenv()
+ensure_config_directory()
+if os.path.exists(ENV_PATH):
+    print(f"File .env trovato in {ENV_PATH}. Caricamento...")
+else:
+    create_env_file()
+
+load_dotenv(ENV_PATH, override=True)
 client_id = os.getenv("SPOTIFY_CLIENT_ID")
 client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
 max_threads = int(os.getenv("MAX_THREADS", "4"))
+print("Configurazione caricata.")
+clear_terminal()
 
 codec = "mp3" #Il supporto a codec diversi non è al momento dispobile
 codec = '.' + codec if not codec.startswith('.') else codec  # Aggiungiamo il punto se manca
 #set dati file scaricati
-DATA_FILE = "data.dat"
+DATA_FILE = os.path.join(CONFIG_FOLDER, "data.dat")
+
 # Lock per operazioni critiche sui file
 file_lock = threading.Lock()
 # Set globale per tracce in elaborazione (chiave: (titolo, artista) in lowercase)
@@ -39,14 +85,6 @@ def log_error(message, output_folder):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
-
-
-def clear_terminal():
-    """Pulisce il terminale a seconda del sistema operativo."""
-    if os.name == 'nt':
-        os.system('cls')
-    else:
-        os.system('clear')
 
 
 def get_spotify_playlist_tracks(playlist_url):
@@ -548,7 +586,7 @@ def update():
     elif result == 3:
         print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The playlist database is corrupted.")
     elif result == 0:
-        print(Fore.RYELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
     else:
         print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Unexpected error.")
 
@@ -586,6 +624,24 @@ def addmeta():
             else:
                 print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{file_path} does not exist")      
 
+def settings():
+    sure = input(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Are you sure you want to modify the settings? You will have to overwrite them all at once, including the Spotify ID and Secret.(y/n): ").lower()
+    if sure == 'y':
+
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"edit .env")
+        spotify_client_id = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_ID: ")
+        spotify_client_secret = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_SECRET: ")
+        max_threads = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter MAX_THREADS: ")
+        preferred_quality = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter PREFERRED_QUALITY: ")
+        os.environ['SPOTIFY_CLIENT_ID'] = spotify_client_id
+        os.environ['SPOTIFY_CLIENT_SECRET'] = spotify_client_secret
+        os.environ['MAX_THREADS'] = max_threads
+        os.environ['PREFERRED_QUALITY'] = preferred_quality
+    else:
+        clear_terminal()
+        return
+
+
 # === MAIN ===
 def main():
     print("Welcome to SpotifyDl. To see the available commands, type help")
@@ -606,6 +662,7 @@ def main():
                "download": "Download any item from Spotify.",
                 "update": "Automatically updates all downloaded playlists with the latest changes.",
                 "addMeta": "Add the metadata of a Spotify song to a specific file",
+                "settings": "edit the .env file",
                 "exit": "Closes the program."
                 }
 
@@ -620,6 +677,8 @@ def main():
             print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Update complete!")
         elif rss == "addmeta":
             addmeta()
+        elif rss == "settings":
+            settings()
         else:
             print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{rss} is not a command")
             
