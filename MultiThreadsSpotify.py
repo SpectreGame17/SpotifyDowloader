@@ -3,6 +3,7 @@ import re
 import uuid
 import threading
 import shutil
+import sys
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -28,17 +29,17 @@ def ensure_config_directory():
 
 def create_env_file():
     print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f".env file not found. Creating a new one.")
-    spotify_client_id = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_ID: ")
-    spotify_client_secret = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_SECRET: ")
-    max_threads = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter MAX_THREADS: ")
-    preferred_quality = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter PREFERRED_QUALITY: ")
-    
+    spotify_client_id = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_ID: ").strip()
+    spotify_client_secret = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter SPOTIFY_CLIENT_SECRET: ").strip()
+    max_threads = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter MAX_THREADS: ").strip()
+    preferred_quality = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Enter PREFERRED_QUALITY: ").strip()
+    cache_yt = os.path.join(CONFIG_FOLDER, "yt-cache")
     env_content = f"""
 SPOTIFY_CLIENT_ID={spotify_client_id}
 SPOTIFY_CLIENT_SECRET={spotify_client_secret}
 MAX_THREADS={max_threads}
 PREFERRED_QUALITY={preferred_quality}
-XDG_CACHE_HOME="$CONFIG_FOLDER/yt-cache"
+XDG_CACHE_HOME={cache_yt}
 """
     
     with open(ENV_PATH, "w") as f:
@@ -51,6 +52,16 @@ def clear_terminal():
         os.system('cls')
     else:
         os.system('clear')
+
+def check_ffmpeg():
+    if shutil.which("ffmpeg") is None:
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"FFmpeg is not installed or not in the PATH.")
+        print("Download it from: https://ffmpeg.org/download.html and install it.")
+        input("\nPress Enter to exit...")
+        sys.exit(1)  # Termina l'app con errore
+    else:
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"FFmpeg is  installed in the PATH.")
+        clear_terminal()
 
 # Carica le variabili d'ambiente dal file .env
 ensure_config_directory()
@@ -645,6 +656,7 @@ def settings():
 # === MAIN ===
 def main():
     print("Welcome to SpotifyDl. To see the available commands, type help")
+    check_ffmpeg()
     while True:
         rss = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter command: ").strip().lower()
         if rss == "download" :
