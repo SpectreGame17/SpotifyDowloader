@@ -79,7 +79,8 @@ sudo apt install ffmpeg
   Once the Python script is installed correctly, simply run it. For help, you can type `help`. The available commands are as follows and perform the corresponding actions:
 
 - **"download"**: Download any item from Spotify.
-- **"update"**: Automatically updates all downloaded playlists with the latest changes.
+- **"update <playlist number>"**: Update a specific playlist using the number obtained from `list`. If you don't enter a number, all playlists will be updated automatically with the latest changes.
+- **"list"**: Show a list of the downloaded playlists.
 - **"addMeta"**: Add the metadata of a Spotify song to a specific file.
 - **"settings"**: Edit the .env settings from the app.
 - **"exit"**: Closes the program.

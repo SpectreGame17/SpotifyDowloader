@@ -76,7 +76,7 @@ def check_ffmpeg():
 #Controlla se esiste un file .env e si prepara a caricarne le variabili
 ensure_config_directory()
 if os.path.exists(ENV_PATH):
-    print(f"File .env trovato in {ENV_PATH}. Caricamento...")
+    print(f"File .env trovato in {ENV_PATH}. Loading...")
 else:
     create_env_file()
 # Carica le variabili d'ambiente dal file .env
@@ -570,24 +570,54 @@ def load_entries():
 
 #La funzione ha lo scopo di assicurarsi che non ci siano ripetizioni in data.dat
 def clean_entries():
-    """Rimuove dal file data.dat le voci con cartelle non più esistenti."""
+    """
+    Rimuove dal file data.dat le voci con cartelle non più esistenti e quelle playlist
+    il cui link non è più valido. Se il link della playlist non è valido, stampa il percorso associato.
+    """
     spotify_urls, output_folders = load_entries()
     
-    # Filtra solo gli elementi con una cartella esistente
-    valid_entries = [(url, folder) for url, folder in zip(spotify_urls, output_folders) if os.path.exists(folder)]
-
+    # Configurazione dell'accesso all'API di Spotify (assicurarsi che client_id e client_secret siano definiti)
+    auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+    sp = spotipy.Spotify(auth_manager=auth_manager)
+    
+    valid_entries = []
+    
+    for url, folder in zip(spotify_urls, output_folders):
+        # Se la cartella non esiste, salta la voce
+        if not os.path.exists(folder):
+            continue
+        
+        # Estrae l'ID della playlist dall'URL
+        playlist_id = None
+        if "playlist/" in url:
+            playlist_id = url.split("playlist/")[1].split('?')[0]
+        
+        # Se non riesco a estrarre un ID valido, o se il link non è più valido, stampa un messaggio e salta la voce
+        if not playlist_id:
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The link is no longer valid for the path: {folder}")
+            continue
+        
+        try:
+            sp.playlist(playlist_id)
+        except Exception:
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The link is no longer valid for the directory: {folder}")
+            continue
+        
+        valid_entries.append((url, folder))
+    
     # Riscrive il file data.dat con solo le voci valide
     with open(DATA_FILE, "w") as file:
         for url, folder in valid_entries:
             file.write(f"{url} {folder}\n")
-
-    return valid_entries  # Ritorna la lista pulita
+    
+    return valid_entries
 
 #Scrive spotify_url e output_folder nel file data.dat, aggiungendo alla fine se esiste già. 
 def save_entry(spotify_url, output_folder):
     
     with open(DATA_FILE, "a") as file:
         file.write(f"{spotify_url} {output_folder}\n")
+
 
 def has_content(file):
     """Restituisce 1 se il file data.dat contiene dati, altrimenti 0."""
@@ -602,20 +632,54 @@ def has_content(file):
     return 3  # Il file è vuoto
 
 #si occupa del comando update
-def update():
+def update(playlist_number):
 
-    result = has_content(DATA_FILE)
-    if result == 1:
-        valid_entries = clean_entries()
-        for url, folder in valid_entries:
-            spotifydl(url, folder, 0)
-        return
-    elif result == 3:
-        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The playlist database is corrupted.")
-    elif result == 0:
-        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
-    else:
-        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Unexpected error.")
+    if playlist_number == 0:   #aggiorna tutte le playlist
+        result = has_content(DATA_FILE)
+        if result == 1:
+            valid_entries = clean_entries()
+            for url, folder in valid_entries:
+                spotifydl(url, folder, 0)
+                print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Update complete!")
+            return
+        elif result == 3:
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The playlist database is corrupted.")
+        elif result == 0:
+            print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
+        else:
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Unexpected error.")
+    else: #aggiorna la playlist playlist_number
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+                
+                if 1 <= playlist_number <= len(lines):
+                    line = lines[playlist_number - 1].strip()
+                    parts = line.split(" ", 1)  # Split only at the first space
+                    
+                    if len(parts) == 2:
+                        url, folder = parts
+                        spotifydl(url, folder, 0) #update
+
+                        #stampa il nome della playlist
+                        auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+                        sp = spotipy.Spotify(auth_manager=auth_manager)
+                        if "playlist" in url:
+                            playlist_id = url.split("/")[-1].split("?")[0]
+                        else:
+                            raise ValueError("Invalid playlist URL")
+                        
+                        playlist_info = sp.playlist(playlist_id)
+                        playlist_name = playlist_info['name']
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{playlist_name} is now updated") #stampa il nome
+
+                    else:
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f" Line {playlist_number} does not contain data in the correct format.")
+                else:
+                    print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Invalid playlist number.")
+        except FileNotFoundError:
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File Not Found.")
+
 #si occupa del comando addmeta
 def addmeta():
     # Richiedi il percorso del file all'utente
@@ -643,9 +707,9 @@ def addmeta():
                     
                     # Passa il percorso completo del file a add_metadata_to_file
                     if add_metadata_to_file(file_path, track_info[0], directory_path):
-                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Metadata added successfully.")
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Metadata added successfully.")
                     else:
-                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Failed to add metadata.")
+                        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Failed to add metadata.")
                 else:
                     print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{spotify_url} is not a valid track link.")
             else:
@@ -668,6 +732,45 @@ def settings():
         clear_terminal()
         return
 
+def GetList():
+    result = has_content(DATA_FILE)
+    if result == 1:
+    ##stampa la lista con i nomi
+        auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+        sp = spotipy.Spotify(auth_manager=auth_manager)
+
+        links = []
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as file:
+                for line in file:
+                    parts = line.strip().split()  # Divide la riga in base agli spazi
+                    if parts:  # Verifica che la riga non sia vuota
+                        links.append(parts[0])  # Il link è il primo elemento della riga
+        except FileNotFoundError:
+            print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"File Not Found.")
+            return
+
+        ID = 1
+        for link in links:
+
+            if "playlist" in link:
+                playlist_id = link.split("/")[-1].split("?")[0]
+            else:
+                raise ValueError("Invalid playlist URL")
+
+            playlist_info = sp.playlist(playlist_id)
+            playlist_name = playlist_info['name']
+            print(Fore.GREEN + Style.BRIGHT + Style.RESET_ALL + f"{ID}: {playlist_name}" + Style.RESET_ALL)
+            ID += 1
+       
+        return
+    elif result == 3:
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"The playlist database is corrupted.")
+    elif result == 0:
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"No playlist has been downloaded yet.")
+    else:
+        print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Unexpected error.")
+    return
 
 # === MAIN ===
 def main():
@@ -676,6 +779,7 @@ def main():
     while True:
         rss = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter command: ").strip().lower()
         if rss == "download" :
+            clear_terminal()
             spotify_url = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the Spotify link: ").strip()
             output_folder = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter the destination folder: ").strip()
             spotifydl(spotify_url, output_folder, 1)
@@ -687,8 +791,9 @@ def main():
         elif rss == "help":
             clear_terminal()
             commands = {
-               "download": "Download any item from Spotify.",
-                "update": "Automatically updates all downloaded playlists with the latest changes.",
+                "download": "Download any item from Spotify.",
+                "update <Playlist Number>": "Update a specific playlist using the number obtained from the list. If you don't enter a number, all playlists will be updated automatically with the latest changes.",
+                "list": "Show a list of the downloaded playlists",
                 "addMeta": "Add the metadata of a Spotify song to a specific file",
                 "settings": "edit the .env file",
                 "exit": "Closes the program."
@@ -697,18 +802,31 @@ def main():
             print("Comandi disponibili:")
             for command, description in commands.items():
                 print(f"- {command}: {description}")
-
+        
         elif rss == "exit":
             return
-        elif rss == "update":
-            update()
-            print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Update complete!")
+        elif rss.startswith("update"):
+            clear_terminal()
+            parts = rss.split()
+            if len(parts) == 1:
+                update(0)
+            elif len(parts) == 2 and parts[1].isdigit():
+                playlist_number = int(parts[1])
+                update(playlist_number)
+            else:
+                print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Invalid update command.")
         elif rss == "addmeta":
+            clear_terminal()
             addmeta()
         elif rss == "settings":
+            clear_terminal()
             settings()
+        elif rss == "list":
+            clear_terminal()
+            GetList()
         else:
             print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{rss} is not a command")
+
             
 
 if __name__ == "__main__":
