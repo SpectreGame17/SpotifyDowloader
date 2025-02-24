@@ -50,16 +50,9 @@ sudo apt install ffmpeg
 ## Installation  
  
 1. Clone this repository.
-2. Configure Client Id, Client Secret, and Max Threads in .env file:
-  Create a .env file in the same directory as your script and add the following variables
-  ```env
-  CLIENT_ID="your_spotify_client_id"
-  CLIENT_SECRET="your_spotify_client_secret"
-  MAX_THREADS=14  # Number of simultaneous downloads (adjust based on your PC's capability)
-  PREFERRED_QUALITY=192 # 320, 256, 192, 160, 128 , 96, 64
-  XDG_CACHE_HOME=./yt-cache
+
   ```
-3. Run the program and enjoy your MP3 downloads!
+2. Run the program and enjoy your MP3 downloads!
   -You can simply open it in Visual Studio and run it in a dedicated terminal.
   -You can create a `spotifydl.bat` file like this:
   ```bat
