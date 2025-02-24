@@ -111,7 +111,7 @@ def log_error(message, output_folder):
         f.write(f"[{timestamp}] {message}\n")
 
 #Funzione che si occupa di prendere le informazioni della playlist
-def get_spotify_playlist_tracks(playlist_url):
+def get_spotify_playlist_tracks(playlist_url, caller):
     """Ottiene la lista dei brani da una playlist di Spotify."""
     auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
     sp = spotipy.Spotify(auth_manager=auth_manager)
@@ -127,7 +127,8 @@ def get_spotify_playlist_tracks(playlist_url):
     playlist_name = playlist_info['name']
 
     clear_terminal()
-    print(Fore.GREEN + Style.BRIGHT + f"You're downloading from: {playlist_name}" + Style.RESET_ALL)
+    if caller == 1:
+        print(Fore.GREEN + Style.BRIGHT + f"You're downloading from: {playlist_name}" + Style.RESET_ALL)
 
     while True:
         results = sp.playlist_tracks(playlist_id, offset=offset)
@@ -148,7 +149,8 @@ def get_spotify_playlist_tracks(playlist_url):
                     'year': year  
                 })
             else:
-                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Track is None, skipping...")
+                if caller == 1:
+                    print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Track is None, skipping...")
 
         if len(results['items']) < 100:
             break
@@ -339,6 +341,7 @@ def add_metadata_to_file(temp_file, track_info, output_folder):
         audio['title'] = track_info['name']
         audio['artist'] = track_info['artists']
         audio['album'] = track_info['album']
+        audio["comment"] = "SpotifyDl"
         if track_info['track_number']:
             audio['tracknumber'] = str(track_info['track_number'])
         audio.save()
@@ -476,7 +479,7 @@ def spotifydl(spotify_url, output_folder, flag):
             # Estrae le tracce in base al tipo di URL e ne verifica la correttezza
             if "playlist" in spotify_url:
                 print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Extracting tracks from the playlist...")
-                tracks = get_spotify_playlist_tracks(spotify_url)
+                tracks = get_spotify_playlist_tracks(spotify_url, 1)
                 if flag == 1:
                     save_entry(spotify_url, output_folder)
             elif "album" in spotify_url:
@@ -631,6 +634,69 @@ def has_content(file):
                 return 1
     return 3  # Il file è vuoto
 
+
+
+def get_file_metadata(mp3_file):
+    """Legge il titolo e l'artista dal metadato ID3 del file MP3."""
+    try:
+        audio = MP3(mp3_file, ID3=EasyID3)
+        title = audio.get("title", [None])[0]  # Prende il primo valore della lista
+        artist = audio.get("artist", [None])[0]  # Prende il primo valore della lista
+        return title, artist  # Restituisce una tupla con titolo e artista
+    except Exception:
+        return None, None  # Se non può leggere i metadati, restituisce None per entrambi
+
+    
+def check_playlist_files(playlist_url, folder):
+    """Controlla se i file della cartella corrispondono ai brani della playlist."""
+    # Ottieni la lista dei brani tramite la funzione aggiornata
+    playlist_tracks_dict = get_spotify_playlist_tracks(playlist_url,0)
+    found_tracks_lower = set()
+    
+    for file in os.listdir(folder):
+        if file.endswith(".mp3"):
+            file_path = os.path.join(folder, file)
+            track_title, track_artist = get_file_metadata(file_path)
+            
+            if track_title:
+                track_title_lower = track_title.lower()
+                # Confronta il nome del file con i titoli della playlist ottenuti dalle API di Spotify
+                match = next((track for track in playlist_tracks_dict 
+              if track['name'].lower() == track_title_lower and track['artists'].lower() == track_artist.lower()), None)
+
+                
+                if match:
+                    found_tracks_lower.add(track_title_lower)
+                else:
+                    choice = input(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + 
+                                   f"The song '{file}' is not in the playlist. Do you want to delete it? (y/n): ").strip().lower()
+                    if choice == "y":
+                        os.remove(file_path)
+                        print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"Song '{file}' deleted.")
+                        clear_terminal()
+                            
+            else:
+                print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + 
+                      f"The file '{file}' does not have a title metadata. I recommend adding it.")
+
+    missing_tracks = [track['name'] for track in playlist_tracks_dict if track['name'].lower() not in found_tracks_lower]
+
+    if missing_tracks:
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "These songs are missing from the folder:")
+        for track in missing_tracks:
+            print(f"   - {track['name']} by {track['artists']}")
+    else:
+        return
+
+
+    # Trova i brani mancanti utilizzando il confronto normalizzato
+    missing_tracks = [original for lower, original in playlist_tracks_dict.items() if lower not in found_tracks_lower]
+    if missing_tracks:
+        print(Fore.YELLOW + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "These songs are missing from the folder:")
+        for track in missing_tracks:
+            print(f"   - {track}")
+        return
+
 #si occupa del comando update
 def update(playlist_number):
 
@@ -640,6 +706,8 @@ def update(playlist_number):
             valid_entries = clean_entries()
             for url, folder in valid_entries:
                 spotifydl(url, folder, 0)
+                check_playlist_files(url, folder)
+                
                 print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Update complete!")
             return
         elif result == 3:
@@ -660,6 +728,7 @@ def update(playlist_number):
                     if len(parts) == 2:
                         url, folder = parts
                         spotifydl(url, folder, 0) #update
+                        check_playlist_files(url, folder)
 
                         #stampa il nome della playlist
                         auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
@@ -672,6 +741,7 @@ def update(playlist_number):
                         playlist_info = sp.playlist(playlist_id)
                         playlist_name = playlist_info['name']
                         print(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f"{playlist_name} is now updated") #stampa il nome
+                        return
 
                     else:
                         print(Fore.RED + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + f" Line {playlist_number} does not contain data in the correct format.")
@@ -774,8 +844,8 @@ def GetList():
 
 # === MAIN ===
 def main():
-    print("Welcome to SpotifyDl. To see the available commands, type help")
     check_ffmpeg()
+    print("Welcome to SpotifyDl. To see the available commands, type help")
     while True:
         rss = input(Fore.GREEN + Style.BRIGHT + "[SpotifyDl] " + Style.RESET_ALL + "Enter command: ").strip().lower()
         if rss == "download" :
