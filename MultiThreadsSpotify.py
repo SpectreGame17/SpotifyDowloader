@@ -341,7 +341,7 @@ def add_metadata_to_file(temp_file, track_info, output_folder):
         audio['title'] = track_info['name']
         audio['artist'] = track_info['artists']
         audio['album'] = track_info['album']
-        audio["comment"] = "SpotifyDl"
+        #audio["comment"] = "SpotifyDl"
         if track_info['track_number']:
             audio['tracknumber'] = str(track_info['track_number'])
         audio.save()
