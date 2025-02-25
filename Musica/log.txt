@@ -1,2 +1,0 @@
-[2025-02-25 02:40:41] Error adding metadata for Chicchi di riso: "'comment' is not a valid key"
-[2025-02-25 02:40:41] Error adding metadata for: Chicchi di riso
