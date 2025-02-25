@@ -50,8 +50,6 @@ sudo apt install ffmpeg
 ## Installation  
  
 1. Clone this repository.
-
-  ```
 2. Run the program and enjoy your MP3 downloads!
   -You can simply open it in Visual Studio and run it in a dedicated terminal.
   -You can create a `spotifydl.bat` file like this:
